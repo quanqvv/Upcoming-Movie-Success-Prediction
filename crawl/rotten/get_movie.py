@@ -17,9 +17,7 @@ import pandas
 
 movie_id_path = config.crawl_data_path + "\\rotten_movie_id.txt"
 movie_metadata_path = config.crawl_data_path + "\\rotten.csv"
-
-os.makedirs(os.path.dirname(movie_id_path), exist_ok=True)
-os.makedirs(os.path.dirname(movie_metadata_path), exist_ok=True)
+config.auto_create_path(movie_id_path, movie_metadata_path)
 
 
 def get_movie_id(num=100):
