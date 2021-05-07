@@ -15,17 +15,17 @@ from urllib.request import urlopen
 from lxml import etree
 import pandas
 
+import utils
+import pathmng
+from crawl import tool
+
 movie_id_path = config.crawl_data_path + "\\rotten_movie_id.txt"
-movie_metadata_path = config.crawl_data_path + "\\rotten.csv"
+movie_metadata_path = pathmng.rotten_path
 config.auto_create_path(movie_id_path, movie_metadata_path)
 
 
 def get_movie_id(num=100):
-    options = webdriver.ChromeOptions()
-    options.add_argument(f"--user-data-dir={config.browser_profile_path}")
-    driver = webdriver.Chrome(config.driver_path, options=options)
-
-
+    driver = utils.get_driver()
     driver.get("https://www.rottentomatoes.com/browse/dvd-streaming-all?minTomato=0&maxTomato=100&services=amazon;hbo_go;itunes;netflix_iw;vudu;amazon_prime;fandango_now&genres=1;2;4;5;6;8;9;10;11;13;18;14&sortBy=release")
 
     # click show more button
@@ -46,10 +46,13 @@ def get_movie_id(num=100):
     with open(movie_id_path, "w") as f:
         f.write("\n".join(list(movie_id_set)))
 
+    driver.close()
 
-class MovieMetadata:
+
+class RottenMovieMetadata(tool.MovieMetadata):
 
     def __init__(self):
+        self.title = None
         self.critic_score = None
         self.audience_score = None
         self.runtime = None
@@ -58,30 +61,17 @@ class MovieMetadata:
         self.theater_release_date = None
         self.dvd_release_date = None
         self.streaming_release_date = None
-        self.genres = []
+        self.genre = []
         self.casts = set()
         self.directors = set()
+        self.link = None
 
-    def __str__(self):
-        return str(vars(self))
-
-    def get_all_attr(self):
-        res = []
-        for attr, _ in self.__dict__.items():
-            res.append(attr)
-        return res
-
-    def get_all_value(self):
-        values = []
-        for attr, value in self.__dict__.items():
-            values.append(value)
-        return values
 
 
 class MovieScraper():
     def __init__(self, **kwargs):
         super(MovieScraper, self).__init__()
-        self.metadata = MovieMetadata()
+        self.metadata = RottenMovieMetadata()
         if 'movie_url' in kwargs.keys():
             self.url = kwargs['movie_url']
 
@@ -90,10 +80,13 @@ class MovieScraper():
         main_soup = BeautifulSoup(page_movie, "lxml")
         # print(main_soup.find("body"))
 
+        self.metadata.link = self.url
+
         # Score
         score = main_soup.find('score-board')
         self.metadata.critic_score = score.attrs['tomatometerscore']
         self.metadata.audience_score = score.attrs['audiencescore']
+        self.metadata.title = score.findNext("h1", attrs={"slot": "title"}).text.strip()
 
         # Movie Info
         movie_info_section = main_soup.find_all('div', class_='media-body')
@@ -108,15 +101,17 @@ class MovieScraper():
             if label == 'Runtime':
                 self.metadata.runtime = value.replace('$', '').replace(',', '')
             elif label == 'Release Date (Theaters)':
-                self.metadata.theater_release_date = re.sub(r'\s\([^)]*\)', '', value).replace("\n\xa0limited", "")
+                self.metadata.theater_release_date = re.sub(r'\s\([^)]*\)', '', value).replace("\n\xa0limited", "").replace("\n"+chr(160)+"wide", "")
             elif label == "Release Date (Streaming)":
-                self.metadata.streaming_release_date = re.sub(r'\s\([^)]*\)', '', value).replace("\n\xa0limited", "")
+                self.metadata.streaming_release_date = re.sub(r'\s\([^)]*\)', '', value).replace("\n\xa0limited", "").replace("\n"+chr(160)+"wide", "")
             elif label == "Release Date (DVD)":
-                self.metadata.streaming_release_date = re.sub(r'\s\([^)]*\)', '', value).replace("\n\xa0limited", "")
+                self.metadata.streaming_release_date = re.sub(r'\s\([^)]*\)', '', value).replace("\n\xa0limited", "").replace("\n"+chr(160)+"wide", "")
             elif label == "Director":
                 self.metadata.directors.add(value.replace("\n", "").strip())
             elif label == "Genre":
-                self.metadata.genres = value.replace(' ', '').replace('\n', '').split(',')
+                self.metadata.genre = value.replace(' ', '').replace('\n', '').split(',')
+
+
 
         # for res in main_soup.findNext("div", class_="media-body").findAll("div", {"data-qa": "cast-crew-item-link"}):
         #     print(res)
@@ -137,27 +132,28 @@ class MovieScraper():
 
 def get_movie_data():
     movie_metadatas = []
+
     def crawl_movie_and_append(movie_id):
         try:
-            values = MovieScraper(movie_url=f"https://www.rottentomatoes.com/m/{movie_id}").extract_metadata().metadata.get_all_value()
-            movie_metadatas.append(values)
+            print("Getting for", movie_id, "at", len(movie_metadatas))
+            metadata = MovieScraper(movie_url=f"https://www.rottentomatoes.com/m/{movie_id}").extract_metadata().metadata
+            movie_metadatas.append(metadata)
         except Exception as e:
             print(e)
 
     with open(movie_id_path, "r") as f:
-        all_movie_id = f.read().split("\n")[0:10]
-        with ThreadPoolExecutor(max_workers=10) as e:
+        all_movie_id = f.read().split("\n")[0:10000]
+        print(len(all_movie_id))
+        with ThreadPoolExecutor(max_workers=20) as e:
             for movie_id in all_movie_id:
-                e.submit(lambda: crawl_movie_and_append(movie_id))
-    for x in movie_metadatas:
-        print(x)
-    movie_metadata_df = pandas.DataFrame(data=movie_metadatas, columns=MovieMetadata().get_all_attr())
-    movie_metadata_df.to_csv(movie_metadata_path)
-    print(movie_metadata_df)
+                e.submit(crawl_movie_and_append, movie_id)
+        # for movie_id in all_movie_id:
+        #     crawl_movie_and_append(movie_id)
+
+    tool.save_metadata_to_csv(movie_metadatas, movie_metadata_path)
 
 
 if __name__ == '__main__':
     import os
-
-    # get_movie_id(num=100)
+    # get_movie_id(num=8000)
     get_movie_data()

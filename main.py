@@ -1,5 +1,5 @@
-from crawl.rotten.get_movie import MovieMetadata
+from crawl.rotten.get_movie import RottenMovieMetadata
 
 if __name__ == '__main__':
-    print(MovieMetadata().get_all_attr())
+    print(RottenMovieMetadata().get_all_attr())
     pass
