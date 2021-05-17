@@ -55,9 +55,9 @@ class RottenMovieMetadata(tool.MovieMetadata):
         self.title = None
         self.critic_score = None
         self.audience_score = None
+        self.release_year = None
         self.runtime = None
-        self.MPAA_rating = None
-        self.studio = None
+        # self.studio = None
         self.theater_release_date = None
         self.dvd_release_date = None
         self.streaming_release_date = None
@@ -65,7 +65,6 @@ class RottenMovieMetadata(tool.MovieMetadata):
         self.casts = set()
         self.directors = set()
         self.link = None
-
 
 
 class MovieScraper():
@@ -76,17 +75,17 @@ class MovieScraper():
             self.url = kwargs['movie_url']
 
     def extract_metadata(self):
-        page_movie = urlopen(self.url)
-        main_soup = BeautifulSoup(page_movie, "lxml")
+        page_movie = requests.get(self.url)
+        main_soup = BeautifulSoup(page_movie.text, "html.parser")
         # print(main_soup.find("body"))
 
         self.metadata.link = self.url
 
-        # Score
         score = main_soup.find('score-board')
         self.metadata.critic_score = score.attrs['tomatometerscore']
         self.metadata.audience_score = score.attrs['audiencescore']
         self.metadata.title = score.findNext("h1", attrs={"slot": "title"}).text.strip()
+        self.metadata.release_year = utils.filter_year(score.findNext("p", attrs={"slot": "info"}).text.strip())
 
         # Movie Info
         movie_info_section = main_soup.find_all('div', class_='media-body')
@@ -107,14 +106,13 @@ class MovieScraper():
             elif label == "Release Date (DVD)":
                 self.metadata.streaming_release_date = re.sub(r'\s\([^)]*\)', '', value).replace("\n\xa0limited", "").replace("\n"+chr(160)+"wide", "")
             elif label == "Director":
-                self.metadata.directors.add(value.replace("\n", "").strip())
+                self.metadata.directors = set([_.strip() for _ in value.replace("\n", "").split(",")])
             elif label == "Genre":
                 self.metadata.genre = value.replace(' ', '').replace('\n', '').split(',')
 
-
-
         # for res in main_soup.findNext("div", class_="media-body").findAll("div", {"data-qa": "cast-crew-item-link"}):
         #     print(res)
+        # Cast
         for res in main_soup.findAll('div', class_='media-body'):
             try:
                 tag = res.findNext("span")
@@ -131,26 +129,19 @@ class MovieScraper():
 
 
 def get_movie_data():
-    movie_metadatas = []
 
-    def crawl_movie_and_append(movie_id):
+    def crawl_one_movie(movie_id):
         try:
-            print("Getting for", movie_id, "at", len(movie_metadatas))
+            print("Getting for", movie_id)
             metadata = MovieScraper(movie_url=f"https://www.rottentomatoes.com/m/{movie_id}").extract_metadata().metadata
-            movie_metadatas.append(metadata)
+            return metadata
         except Exception as e:
             print(e)
 
     with open(movie_id_path, "r") as f:
-        all_movie_id = f.read().split("\n")[0:10000]
-        print(len(all_movie_id))
-        with ThreadPoolExecutor(max_workers=20) as e:
-            for movie_id in all_movie_id:
-                e.submit(crawl_movie_and_append, movie_id)
-        # for movie_id in all_movie_id:
-        #     crawl_movie_and_append(movie_id)
-
-    tool.save_metadata_to_csv(movie_metadatas, movie_metadata_path)
+        all_movie_id = f.read().split("\n")
+        # all_movie_id = ["the_last_5_years"]
+        tool.streaming_crawl(all_movie_id, crawl_one_movie, movie_metadata_path, start_group=15)
 
 
 if __name__ == '__main__':

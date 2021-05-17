@@ -3,7 +3,9 @@ from collections import defaultdict
 import nltk
 import pandas
 import pyspark
+from django.utils.functional import lazy
 from pyspark.sql import SparkSession
+from pyspark.sql.dataframe import DataFrame
 from pyspark.sql.functions import *
 from pyspark.sql.types import IntegerType
 
@@ -14,13 +16,13 @@ import json
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 
+from crawl.imdb import lazyCrawl
 
 rotten_path = "file:///" + config.crawl_data_path + "\\rotten.csv"
 cleaned_rotten_path = "file:///" + config.crawl_data_path + "\\rotten_cleaned\\"
 
 imdb_path = "file:///" + config.crawl_data_path + "\\imdb.csv"
 cleaned_imdb_path = "file:///" + config.crawl_data_path + "\\imdb_cleaned.csv"
-
 
 normalize_title_func = udf(lambda x: utils.normalize_string(x))
 
@@ -49,25 +51,10 @@ class AwardsCheckExist:
         return AwardsCheckExist._singleton
 
 
-# print(AwardsCheckExist.get_instance().check("EMIL JANNINGS", 1929))
-# breakpoint()
-
-
-def get_extract_release_year_func():
-    def _release_year(*columns):
-        for _col in columns:
-            year = utils.filter_year(_col)
-            if year is not None:
-                return year
-
-    return udf(lambda *columns: _release_year(*columns))
-
-
 def count_awards(*columns):
     def _count_awards(*columns):
         try:
             release_year, actor_col, director_col = columns
-            actor_director_set = set()
             actors = json.loads(actor_col.replace("'", "\""))
             directors = json.loads(director_col.replace("'", "\""))
             actor_director_set = set(actors) | set(directors)
@@ -82,92 +69,67 @@ def count_awards(*columns):
     return udf(lambda *columns: _count_awards(*columns))(*columns)
 
 
-def get_rotten_and_imdb_joining_df():
-    df_rotten = spark.read.csv(path=rotten_path, header=True)\
+def re_crawl_and_get_imdb_detail_df(df: DataFrame):
+    all_link = df.select("imdb_link").rdd.map(lambda row: row["imdb_link"]).collect()
+    lazyCrawl.crawl_all_movie_detail(all_link)
+    return spark.read.csv(utils.build_hadoop_local_path(path=pathmng.imdb_detail_path), header=True)
+
+
+def build_movie_dataframe():
+    df_rotten = utils.read_csv_with_pyspark(spark, pathmng.rotten_path)\
         .withColumn("title", normalize_title_func("title"))\
-        .withColumn("release_year", get_extract_release_year_func()("theater_release_date", "dvd_release_date", "streaming_release_date"))\
-        .filter(col("runtime").isNotNull())\
-        .withColumn("runtime", udf(lambda runtime_col: utils.time_str_to_int(runtime_col), IntegerType())("runtime"))\
-        .drop("runtime")\
         .filter(col("audience_score").isNotNull())\
-        .withColumn("count_award", count_awards("release_year", "casts", "directors"))
+        .drop("runtime")\
+        .withColumnRenamed("link", "rotten_link")\
+        .withColumn("count_award", count_awards("release_year", "casts", "directors"))\
+        .dropDuplicates(["title", "release_year"])
 
-    def filter_error():
-        pass
-
-    df_imdb = spark.read.csv(path=imdb_path, header=True)\
+    df_imdb = spark.read.csv(path=imdb_path, header=True) \
+            .withColumn("title", normalize_title_func("title"))\
             .filter(col("runtime").contains("min"))\
             .drop("genre")\
+            .drop("budget")\
+            .drop("opening_weekend_gross")\
+            .drop("box_office_gross")\
+            .drop("certificate")\
             .withColumn("runtime", udf(lambda x: int(str(x).replace(" min", "")), IntegerType())("runtime"))\
-            .withColumn("title", normalize_title_func("title"))
+            .withColumnRenamed("link", "imdb_link")\
 
     df_rotten.show()
-    # df_imdb.show()
-    # df_main = df_rotten
+    df_imdb.show()
+
     df_main = df_rotten.join(df_imdb, on=["title", "release_year"]).dropDuplicates(["title", "release_year"])
+
     print("count df_main:", df_main.count())
+    imdb_detail_df = re_crawl_and_get_imdb_detail_df(df_main).withColumnRenamed("link", "imdb_link")
+
+    df_main = df_main.join(imdb_detail_df, on=["imdb_link"])
+
+    df_main.show()
+
+    print("Writing all movie data...")
+    df_main.toPandas().to_csv(pathmng.all_cleaned_movie_path, index=False)
+
     return df_main
 
 
-class ListEncoder:
+def normalize_data():
+    df_main = utils.read_csv_with_pyspark(spark, pathmng.all_cleaned_movie_path)\
+        .filter(col("budget").isNotNull() & col("plot_des").isNotNull() & col("theater_release_date").isNotNull())\
+        .filter(col("box_office_gross").isNotNull() & col("opening_weekend_gross").isNotNull())\
+        .filter(col("critic_score").isNotNull())\
+        .withColumn("budget", udf(lambda _col: utils.string_to_int_by_filter_number(_col), IntegerType())("budget"))\
+        .withColumn("box_office_gross", udf(lambda _col: utils.string_to_int_by_filter_number(_col), IntegerType())("box_office_gross"))\
+        .withColumn("opening_weekend_gross", udf(lambda _col: utils.string_to_int_by_filter_number(_col), IntegerType())("opening_weekend_gross"))
 
-    def __init__(self, all_elements):
-        self.all_elements = all_elements
-        self.element_to_index = {}
-        for i in range(len(self.all_elements)):
-            self.element_to_index[self.all_elements[i]] = i
-
-    def get_bit_vector(self, elements):
-        vector = [0] * len(self.all_elements)
-        for ele in elements:
-            if ele in self.element_to_index:
-                vector[self.element_to_index[ele]] = 1
-        return tuple(vector)
-
-
-def build_main():
-    df = get_rotten_and_imdb_joining_df()
-    df = df.select("runtime", "count_award", "genre", "plot_des", "audience_score")
-    genre_list = []
-
-    paragraph_list = []
-    word_list = []
-    temp_row_list = df.select("genre", "plot_des").rdd\
-        .collect()
-
-    # get word list
-    for row in temp_row_list:
-        genre_list.extend(utils.get_list_from_str_json(row.genre))
-        if row.plot_des is not None:
-            paragraph_list.append(row.plot_des)
-    for paragraph in paragraph_list:
-        paragraph: str
-        # normalize word
-        word_list.extend(utils.get_words_without_stopword(utils.remove_non_alphabet(paragraph.lower().strip())))
-
-    # build bit vector
-    genre_encoder = ListEncoder(utils.filter_duplicate(genre_list))
-    from collections import Counter
-    occurrence_count = Counter(word_list)
-    word_list = [_[0] for _ in occurrence_count.most_common(100)]
-    word_encoder = ListEncoder(word_list)
-    print(utils.filter_duplicate(genre_list))
-    print(word_list)
-
-    def each_row(row):
-        res = [row.runtime, int(row.count_award)]
-        res.extend(genre_encoder.get_bit_vector(utils.get_list_from_str_json(row.genre)))
-        res.extend(word_encoder.get_bit_vector(str(row.plot_des).split(" ")))
-        res.append(int(row.audience_score))
-        return tuple(res)
-
-    res = df.rdd.map(lambda row: each_row(row)).collect()
-
-    import numpy as np
-    print(np.array(res))
-    np.save(pathmng.movie_vector_path, np.array(res))
+    df_main = df_main.filter(col("box_office_gross").isNotNull())
+    df_main.show()
+    print("Size after normalized:", df_main.count())
+    return df_main
 
 
+spark = SparkSession.builder.master("local[*]").appName("oke").getOrCreate()
 if __name__ == '__main__':
-    spark = SparkSession.builder.master("local[*]").appName("oke").getOrCreate()
-    build_main()
+    # spark.createDataFrame([["a", "b"]], ["a", "b"]).toPandas().to_csv(pathmng.temp_path)
+    # build_movie_dataframe()
+    normalize_data()

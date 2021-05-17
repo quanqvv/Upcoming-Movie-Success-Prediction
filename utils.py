@@ -1,5 +1,6 @@
 import json
 
+import pandas
 from nltk import word_tokenize
 from nltk.corpus import stopwords
 from pyspark.sql import SparkSession
@@ -82,5 +83,59 @@ def measure_accuracy(label_predicted, label_origin):
         error += abs(label_predicted[index] - label_origin[index])/label_origin[index]
 
     print("Accuracy:", 1 - error/len(label_origin))
+
+
+def try_catch(func):
+    try:
+        return func()
+    except:
+        pass
+
+
+def split_list_to_group(number_per_group, _list):
+    final = [_list[i * number_per_group:(i + 1) * number_per_group] for i in range((len(_list) + number_per_group - 1) // number_per_group)]
+    return final
+
+
+def build_hadoop_local_path(path):
+    return "file:///"+path
+
+
+def read_csv_with_pyspark(spark: SparkSession, path):
+    return spark.createDataFrame(pandas.read_csv(path, dtype=str).astype(str)).replace("nan", None)
+
+
+def save_pyspark_df_to_csv(df, path):
+    df.toPandas().to_csv(path, index=False)
+
+
+def get_datetime_from_string(date_str):
+    from datetime import datetime
+    try:
+        return datetime.strptime(date_str, '%b %d, %Y')
+    except:
+        try:
+            return datetime.strptime(date_str, "%Y-%m-%d")
+        except:
+            pass
+    return None
+
+
+def string_to_int_by_filter_number(text: str):
+    import re
+    try:
+        return int(re.sub("[^0-9]", "", text))
+    except:
+        return None
+
+
+def get_most_common(_list, num):
+    from collections import Counter
+    occurrence_count = Counter(_list)
+    return [_[0] for _ in occurrence_count.most_common(num)]
+
+
+if __name__ == '__main__':
+    print(get_datetime_from_string(None))
 
 

@@ -25,10 +25,10 @@ class ImdbMovieMetadata(tool.MovieMetadata):
         self.user_rate = None
         self.imdb_rating = None
         self.plot_des = None
-        self.budget = None
+        # self.budget = None
         self.release_year = None
-        self.box_office_gross = None
-        self.opening_weekend_gross = None
+        # self.box_office_gross = None
+        # self.opening_weekend_gross = None
         self.genre = None
         self.runtime = None
         self.certificate = None
@@ -84,7 +84,7 @@ def parse_data(string_url) :
 
         # inside\
         if url is not None:
-            url = "https://www.imdb.com" + url
+            # url = "https://www.imdb.com" + url
             # print(url)
             # soup_inside = get_page_content_as_soup(url)
             # print(soup_inside)
@@ -96,9 +96,8 @@ def parse_data(string_url) :
             #         movie_metadata.budget = block_str
             #     elif block_str == "Opening Weekend USA:":
             #         movie_metadata.opening_weekend_gross = "ab"
-            #     elif block_str == "Gross USA:":
+            #     elif block_str == "Cumulative Worldwide Gross:":
             #         movie_metadata.box_office_gross = block_str
-            #     print(block_str)
             # def filter_money(text: str):
             #     re.search()
             movie_metadata.link = url

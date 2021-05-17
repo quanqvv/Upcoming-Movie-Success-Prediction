@@ -1,31 +1,30 @@
 import numpy as np
 from sklearn import svm
 import pandas
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import LinearRegression, Lasso, LogisticRegression
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
+from sklearn.svm import SVC
+
 import pathmng
 import sys
 
 import utils
 
-data = np.load(pathmng.movie_vector_path)
+data = np.load(pathmng.movie_vector_path, allow_pickle=True)
 
-clf = LinearRegression()
+print("Data shape:", data.shape)
 
-X = data[:, :-1]
-y = data[:, -1]
+num_label = 4
+X = data[:, :-num_label]
 
-# print("Data shape:", data.shape)
-print(data)
-# breakpoint()
 
-# print(data)
-
-data_train, data_test, labels_train, labels_test = train_test_split(X, y, test_size=0.3)
-
-clf.fit(data_train, labels_train)
-
-test_predicted = clf.predict(data_test)
-
-utils.measure_accuracy(labels_test, test_predicted)
+for i in range(1, num_label+1)[::-1]:
+    y = data[:, -i]
+    clf = LinearRegression()
+    # clf = SVC()
+    # clf = Lasso(alpha=1)
+    data_train, data_test, labels_train, labels_test = train_test_split(X, y, test_size=0.2, random_state=False)
+    clf.fit(data_train, labels_train)
+    # utils.measure_accuracy(clf.predict(data_test), labels_test)
+    print(clf.score(data_test, labels_test))
