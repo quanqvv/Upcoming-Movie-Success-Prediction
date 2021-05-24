@@ -73,7 +73,7 @@ def streaming_crawl(source_list: list, func, path_save_file, number_per_group=10
             continue
         print("GROUP:", index)
         movie_metadatas = []
-        with ThreadPoolExecutor(max_workers=40) as e:
+        with ThreadPoolExecutor(max_workers=50) as e:
             for arg in group:
                 e.submit(lambda arg: movie_metadatas.append(func(arg)), arg)
 

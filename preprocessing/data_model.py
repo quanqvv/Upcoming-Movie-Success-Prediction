@@ -61,27 +61,58 @@ class DataModel:
         self.mpaa_rating_list_encoder = ListEncoder(mpaa_rating_list)
         self.genre_list_encoder = ListEncoder(genre_list)
 
-    def get_common_feature(self, row):
-        vector = []
-        vector.extend(self.mpaa_rating_list_encoder.get_bit_vector(row["mpaa_rating"]))
-        vector.extend(self.movie_studio_list_encoder.get_bit_vector(row["studio"]))
-        vector.extend(self.plot_des_word_list_encoder.get_bit_vector(row["plot_des"].split(" ")))
-        vector.extend(self.genre_list_encoder.get_bit_vector(utils.get_list_from_str_json(row["genre"])))
+    def build_feature_dict(self, row):
+        release_date = utils.get_datetime_from_string(row["theater_release_date"])
+        if release_date is None:
+            print(row["theater_release_date"])
+        return {
+            "mpaa_rating": self.mpaa_rating_list_encoder.get_bit_vector(row["mpaa_rating"]),
+            "runtime": (int(row["runtime"]),),
+            "studio": self.movie_studio_list_encoder.get_bit_vector(row["studio"]),
+            "release_month": get_release_month_vector(row["theater_release_date"]),
+            "popular_weekend": get_popular_weekend_vector(release_date.strftime("%Y-%m-%d")),
+            "budget": (int(row["budget"]),),
+            "award": (int(row["award"]),),
+            "genre": self.genre_list_encoder.get_bit_vector(utils.get_list_from_str_json(row["genre"])),
+            "plot_des": self.plot_des_word_list_encoder.get_bit_vector(row["plot_des"].split(" "))
+        }
 
-        release_date = utils.get_datetime_from_string(row["theater_release_date"]) \
-                       # or utils.get_datetime_from_string("dvd_release_date") \
-                       # or utils.get_datetime_from_string("streaming_release_date")
-        vector.extend(get_release_month_vector(row["theater_release_date"]))
-        vector.extend(get_popular_weekend_vector(release_date.strftime("%Y-%m-%d")))
-        vector.append(int(row["runtime"]))
-        vector.append(int(row["budget"]))
-        vector.append(int(row["count_award"]))
+    def build_feature_vector(self, row, *feature_names):
+
+        feature_dict = self.build_feature_dict(row)
+        if feature_names[0] == "*":
+            feature_names = feature_dict.keys()
+        vector = []
+        for feature_name in feature_names:
+            vector.extend(feature_dict[feature_name])
         return vector
 
-    def get_feature_for_linear(self, row: dict):
-        vector = self.get_common_feature(row)
-        vector.append(int(row["audience_score"]))
-        vector.append(int(row["critic_score"]))
+    def get_full_feature(self, row: dict):
+        vector = self.build_feature_vector(row, "*")
+        vector.append(float(row["audience_score"]) * 100)
+        vector.append(int(row["box_office_gross"]))
+        vector.append(int(row["opening_weekend_gross"]))
+        return vector
+
+    def get_feature_for_audience_score(self, row: dict):
+        vector = self.build_feature_vector(row, "genre", "mpaa_rating", "runtime", "award", "studio")
+        vector.append(float(row["audience_score"]) * 100)
+        vector.append(int(row["box_office_gross"]))
+        vector.append(int(row["opening_weekend_gross"]))
+        return vector
+
+    def get_feature_for_box_office_gross(self, row: dict):
+        vector = self.build_feature_vector(row, "genre", "mpaa_rating", "runtime", "studio", "award", "budget",
+                                           "release_month")
+        vector.append(float(row["audience_score"]) * 100)
+        vector.append(int(row["box_office_gross"]))
+        vector.append(int(row["opening_weekend_gross"]))
+        return vector
+
+    def get_feature_for_open_weekend_gross(self, row: dict):
+        vector = self.build_feature_vector(row, "genre", "mpaa_rating", "runtime", "studio", "award", "budget",
+                                           "release_month")
+        vector.append(float(row["audience_score"]) * 100)
         vector.append(int(row["box_office_gross"]))
         vector.append(int(row["opening_weekend_gross"]))
         return vector

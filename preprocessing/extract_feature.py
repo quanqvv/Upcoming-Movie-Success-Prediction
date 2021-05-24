@@ -1,10 +1,10 @@
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import count, col
+from pyspark.sql import SparkSession, DataFrame
+from pyspark.sql.functions import count, col, udf
+from pyspark.sql.types import IntegerType, StringType
 
 import pathmng
 import utils
 from preprocessing.data_model import DataModel
-from preprocessing.merge import normalize_data
 
 
 def get_words_from_plot_des(paragraph_list):
@@ -16,23 +16,23 @@ def get_words_from_plot_des(paragraph_list):
     return utils.get_most_common(word_list, 90)
 
 
-def build_main():
+def build_main(normalize_func):
     # df = spark.read.csv(utils.build_hadoop_local_path(pathmng.all_cleaned_movie_path))
     # df = df.select("runtime", "count_award", "genre", "plot_des", "audience_score")
-    df = normalize_data().replace("Not Rated", "Unrated")
+    df = normalize_func().limit(20000).replace("Not Rated", "Unrated")
 
     genre_list = []
     paragraph_list = []
     movie_studios = []
     mpaa_ratings = []
 
-    temp_row_list = df.select("genre", "plot_des", "studio", "mpaa_rating").rdd\
+    temp_row_list = df.select("genre", "plot_des", "studio", "mpaa_rating").rdd \
         .collect()
 
-    common_studio_df = df.select("studio")\
-        .groupby("studio")\
-        .agg(count("*").alias("count"))\
-        .orderBy(col("count").desc())\
+    common_studio_df = df.select("studio") \
+        .groupby("studio") \
+        .agg(count("*").alias("count")) \
+        .orderBy(col("count").desc()) \
         .limit(22)
 
     for row in temp_row_list:
@@ -53,21 +53,68 @@ def build_main():
                            utils.filter_duplicate(mpaa_ratings),
                            utils.filter_duplicate(utils.get_most_common(genre_list, 22)))
 
-    print(utils.filter_duplicate(movie_studios))
-    print(utils.filter_duplicate(mpaa_ratings))
-    print(utils.filter_duplicate(genre_list))
-    print(utils.filter_duplicate(plot_des_word_list))
+    print("Studio:", len(utils.filter_duplicate(movie_studios)), utils.filter_duplicate(movie_studios))
+    print("MPAA Rating:", len(utils.filter_duplicate(mpaa_ratings)), utils.filter_duplicate(mpaa_ratings))
+    print("Genre:", len(utils.filter_duplicate(genre_list)), utils.filter_duplicate(genre_list))
+    print("Plot Des:", len(utils.filter_duplicate(plot_des_word_list)), utils.filter_duplicate(plot_des_word_list))
 
-    # row0 = df.rdd.take(1)[0]
-    # data_model.get_feature_for_linear(row0)
+    full_feature = df.rdd.map(lambda row: tuple(data_model.get_full_feature(row)))
+    features_for_audience_score= df.rdd.map(lambda row: tuple(data_model.get_feature_for_audience_score(row)))
+    features_for_open_weekend_gross = df.rdd.map(lambda row: tuple(data_model.get_feature_for_open_weekend_gross(row)))
+    features_for_box_office_gross = df.rdd.map(lambda row: tuple(data_model.get_feature_for_open_weekend_gross(row)))
 
-    res = df.rdd.map(lambda row: tuple(data_model.get_feature_for_linear(row)))
-    print("size vector", len(res.take(1)[0]))
-    res = res.collect()
     import numpy as np
-    np.save(pathmng.movie_vector_path, np.array(res))
+    np.save(pathmng.movie_full_feature_vector_path, np.array(full_feature.collect()))
+    np.save(pathmng.movie_audience_score_vector_path, np.array(features_for_audience_score.collect()))
+    np.save(pathmng.movie_open_weekend_gross_vector_path, np.array(features_for_open_weekend_gross.collect()))
+    np.save(pathmng.movie_box_office_gross_vector_path, np.array(features_for_box_office_gross.collect()))
+
+
+def normalize_data(write=False):
+    df_main = utils.read_csv_with_pyspark(spark, pathmng.all_cleaned_movie_path)\
+        .filter(col("budget").isNotNull() & col("plot_des").isNotNull())\
+        .filter(col("box_office_gross").isNotNull() & col("opening_weekend_gross").isNotNull())\
+        .withColumn("budget", udf(lambda _col: utils.string_to_int_by_filter_number(_col), IntegerType())("budget"))\
+        .withColumn("box_office_gross", udf(lambda _col: utils.string_to_int_by_filter_number(_col), IntegerType())("box_office_gross"))\
+        .withColumn("theater_release_date", udf(lambda _col: utils.normalize_date_string(_col), StringType())(col("theater_release_date"))).filter(col("theater_release_date").isNotNull())\
+        .withColumn("opening_weekend_gross", udf(lambda _col: utils.string_to_int_by_filter_number(_col), IntegerType())("opening_weekend_gross"))
+
+    df_main = df_main.filter(col("box_office_gross").isNotNull())
+    df_main = normalize_money(df_main, "budget", "box_office_gross", "opening_weekend_gross")
+
+    print("Size after normalized:", df_main.count())
+    if write:
+        df_main.toPandas().to_csv(pathmng.all_cleaned_movie_path, index=False)
+    df_main.show()
+    return df_main
+
+
+def normalize_money(df: DataFrame, *money_column):
+    func = udf(lambda money_col, release_year: utils.get_exchanged_usd(money_col, release_year), IntegerType())
+    for _col in money_column:
+        df = df.withColumn(_col, func(col(_col), col("release_year")))
+    return df
+
+
+def normalize_data_for_audience_score(write=False):
+    # .filter(col("budget").isNotNull() & col("plot_des").isNotNull())
+    df_main = utils.read_csv_with_pyspark(spark, pathmng.all_cleaned_movie_path)\
+        .filter(col("plot_des").isNotNull())\
+        .withColumn("budget", udf(lambda _col: utils.string_to_int_by_filter_number(_col), IntegerType())("budget"))\
+        .withColumn("box_office_gross", udf(lambda _col: utils.string_to_int_by_filter_number(_col), IntegerType())("box_office_gross")) \
+        .withColumn("theater_release_date", udf(lambda _col: utils.normalize_date_string(_col), StringType())(col("theater_release_date"))).filter(col("theater_release_date").isNotNull()) \
+        .withColumn("opening_weekend_gross", udf(lambda _col: utils.string_to_int_by_filter_number(_col), IntegerType())("opening_weekend_gross"))
+
+    df_main = normalize_money(df_main, "budget", "box_office_gross", "opening_weekend_gross")
+
+    print("Size after normalized:", df_main.count())
+    df_main.show()
+    if write:
+        df_main.toPandas().to_csv(pathmng.all_cleaned_movie_path, index=False)
+    return df_main
 
 
 if __name__ == '__main__':
     spark = SparkSession.builder.master("local[*]").appName("oke").getOrCreate()
-    build_main()
+    # build_main(normalize_func=normalize_data)
+    build_main(normalize_func=normalize_data_for_audience_score)

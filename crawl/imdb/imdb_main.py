@@ -5,8 +5,10 @@ import pandas
 import requests
 import xlsxwriter
 from bs4 import Tag
+import pathmng
 
 import config
+import utils
 from crawl import tool
 
 list_data_init = [[]]
@@ -25,13 +27,9 @@ class ImdbMovieMetadata(tool.MovieMetadata):
         self.user_rate = None
         self.imdb_rating = None
         self.plot_des = None
-        # self.budget = None
         self.release_year = None
-        # self.box_office_gross = None
-        # self.opening_weekend_gross = None
         self.genre = None
         self.runtime = None
-        self.certificate = None
         self.link = None
 
 
@@ -52,6 +50,8 @@ def parse_data(string_url) :
         if item.find('h3', "lister-item-header").a is not None:
             movie_metadata.title = item.find('h3', "lister-item-header").a.string.strip()
             url = item.find('h3', "lister-item-header").a["href"]
+            if str(url).startswith("https://www.imdb.com") is False:
+                url ="https://www.imdb.com" + url
             release_year_str = item.find('h3', "lister-item-header").find_all("span")[1].string
             import re
             movie_metadata.release_year = int(re.search(r"\d+", release_year_str).group())
@@ -106,20 +106,52 @@ def parse_data(string_url) :
     return movie_metadata_list
 
 
+def get_imdb_list_page_link():
+    class PageLink(tool.MovieMetadata):
+        def __init__(self, link):
+            self.link = link
+    driver = utils.get_driver()
+
+    pre_link = "https://www.imdb.com/search/title/?release_date=2010-01-01,2020-12-31&runtime=60,300&start=9951&ref_=adv_nxt"
+    pre_link = "https://www.imdb.com/search/title/?release_date=2000-01-01,2009-12-31&runtime=60,300"
+
+    try:
+        pre_df = pandas.read_csv(pathmng.imdb_next_link_path)
+        pre_link = list(pre_df["link"])[-1]
+    except:
+        pass
+    link_list = []
+
+    driver.get(pre_link)
+    import time
+    for i in range(1, 1000):
+        link = driver.find_element_by_xpath('//*[@class="lister-page-next next-page"]').get_attribute("href")
+        link_list.append(PageLink(link))
+        driver.find_element_by_xpath('//*[@class="lister-page-next next-page"]').click()
+        time.sleep(2)
+        if i % 50 == 0:
+            tool.save_metadata_to_csv(utils.filter_duplicate_preserve_order(link_list), pathmng.imdb_next_link_path)
+            link_list.clear()
+
+
 if __name__ == '__main__':
     movie_metadata_list = []
-    for i in range(1, 40000, 50):
-        string_url = "https://www.imdb.com/search/title/?release_date=2010-01-01,2020-12-31&runtime=60,300&start=" + str(i)
-        print("crawled...", i+50, "pages" )
-        res = parse_data(string_url)
-        movie_metadata_list.extend(res)
 
-    tool.save_metadata_to_csv(movie_metadata_list, imdb_movie_path)
+    for year in range(1980, 1999):
+        for i in range(1, 2000, 50):
+            string_url = f"https://www.imdb.com/search/title/?release_date={year}-01-01,{year}-12-31&runtime=60,300&start=" + str(i)
+            print("crawled...", i+50, "movies" )
+            res = parse_data(string_url)
+            movie_metadata_list.extend(res)
+        tool.save_metadata_to_csv(movie_metadata_list, imdb_movie_path)
+        movie_metadata_list.clear()
 
-
-    # df = pandas.DataFrame(list_data_init, columns=['title','user_rate', 'meta_score', 'certificate', 'run_time', 'genre', 'description'])
-    # writer = pandas.ExcelWriter("D:\\20202\\phân tích nghiệp vụ thông minh\\data_movie.xlsx", engine='xlsxwriter')
-    # df.to_excel(writer, sheet_name= "Sheet1", index=False)
-    # writer.save()
-    # df.to_csv(imdb_movie_path)
-    # print(len(list_data_init))
+    # # crawl bắt đầu từ title 10001
+    # for index, link in enumerate(list(pandas.read_csv(pathmng.imdb_next_link_path)["link"])):
+    #     print("crawled...", (index+1) * 50, "movies" )
+    #     res = parse_data(link)
+    #     movie_metadata_list.extend(res)
+    #
+    #     if index % 50 == 49:
+    #         tool.save_metadata_to_csv(movie_metadata_list, imdb_movie_path)
+    #         movie_metadata_list.clear()

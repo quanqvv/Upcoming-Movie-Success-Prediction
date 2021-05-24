@@ -6,6 +6,7 @@ from nltk.corpus import stopwords
 from pyspark.sql import SparkSession
 from selenium import webdriver
 import config
+import pathmng
 
 
 def get_driver(direct_profile=config.browser_profile_path):
@@ -17,7 +18,7 @@ def get_driver(direct_profile=config.browser_profile_path):
 
 def remove_non_alphabet(text: str):
     import re
-    return re.sub("[^a-zA-Z ]", "", text)
+    return re.sub("[^a-zA-Z0-9 ]", "", text)
 
 
 def normalize_string(text: str):
@@ -77,6 +78,10 @@ def filter_duplicate(_list):
     return list(set(_list))
 
 
+def filter_duplicate_preserve_order(_list):
+    return list(dict.fromkeys(_list))
+
+
 def measure_accuracy(label_predicted, label_origin):
     error = 0
     for index in range(label_predicted.size):
@@ -109,6 +114,14 @@ def save_pyspark_df_to_csv(df, path):
     df.toPandas().to_csv(path, index=False)
 
 
+def normalize_date_string(_str):
+    try:
+        return get_datetime_from_string(_str).strftime("%Y-%m-%d")
+    except:
+        pass
+    return None
+
+
 def get_datetime_from_string(date_str):
     from datetime import datetime
     try:
@@ -117,7 +130,13 @@ def get_datetime_from_string(date_str):
         try:
             return datetime.strptime(date_str, "%Y-%m-%d")
         except:
-            pass
+            try:
+                return datetime.strptime(date_str, "%B %d %Y")
+            except:
+                try:
+                    return datetime.strptime(date_str, "%d %B %Y")
+                except:
+                    pass
     return None
 
 
@@ -126,7 +145,7 @@ def string_to_int_by_filter_number(text: str):
     try:
         return int(re.sub("[^0-9]", "", text))
     except:
-        return None
+        return 0
 
 
 def get_most_common(_list, num):
@@ -135,7 +154,30 @@ def get_most_common(_list, num):
     return [_[0] for _ in occurrence_count.most_common(num)]
 
 
+def get_spark():
+    return SparkSession.builder.master("local[*]").appName("oke").getOrCreate()
+
+
+year_to_cpi = {}
+
+
+def get_exchanged_usd(value, year, to_year=2020):
+    if year is None or value is None:
+        return 0
+    try:
+        year = int(year)
+        if year_to_cpi == {}:
+            df = pandas.read_csv(pathmng.consumer_price_index_path)
+            for index, (_year, cpi) in df.iterrows():
+                year_to_cpi[_year] = cpi
+        return int(year_to_cpi[to_year] / year_to_cpi[year] * value)
+    except Exception as e:
+        return 0
+
+
 if __name__ == '__main__':
-    print(get_datetime_from_string(None))
+    # print(filter_year("23 April 2021"))
+    # print(get_datetime_from_string("April 27 2010 (USA)"))
+    print(get_exchanged_usd(100.1, "2018"))
 
 
