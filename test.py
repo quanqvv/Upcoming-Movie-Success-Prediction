@@ -1,11 +1,11 @@
-import cpi
-import pathmng
+from sklearn.metrics import mean_squared_error
+import numpy as np
 
-import pandas
+# Given values
+Y_true = np.array([1, 1, 2, 2, 1]).T # Y_true = Y (original values)
 
-cpi_list = []
-for i in range(1970, 2021):
-    cpi_list.append((i, cpi.get(i)))
+# calculated values
+Y_pred = np.array([0.6, 1.29, 1.99, 2.69, 3000.4]).T # Y_pred = Y'
 
-df = pandas.DataFrame(data=cpi_list, columns=["year", "cpi"])
-df.to_csv(pathmng.consumer_price_index_path, header=True, index=False)
+# Calculation of Mean Squared Error (MSE)
+print(mean_squared_error(Y_true, Y_pred))

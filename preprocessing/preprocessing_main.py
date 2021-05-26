@@ -27,6 +27,8 @@ def show_all():
     df_imdb.show()
     df_wiki.show()
 
+    df_all = utils.read_csv_with_pyspark(spark, pathmng.all_cleaned_movie_path).show()
+
 
 if __name__ == '__main__':
     spark = utils.get_spark()

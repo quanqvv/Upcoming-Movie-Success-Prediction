@@ -82,12 +82,18 @@ def filter_duplicate_preserve_order(_list):
     return list(dict.fromkeys(_list))
 
 
-def measure_accuracy(label_predicted, label_origin):
+def measure_accuracy(label_origin, label_predicted):
     error = 0
+    counter = 0
     for index in range(label_predicted.size):
-        error += abs(label_predicted[index] - label_origin[index])/label_origin[index]
-
-    print("Accuracy:", 1 - error/len(label_origin))
+        if label_origin[index] != 0 and label_predicted[index] > 0:
+            temp = abs(abs(label_predicted[index]) - label_origin[index])/abs(max(label_origin[index], abs(label_predicted[index])))
+            # if temp > 1:
+            #     print(label_origin[index], label_predicted[index])
+            #     breakpoint()\
+            error += temp
+            counter += 1
+    print("Accuracy:", 1 - error/counter)
 
 
 def try_catch(func):

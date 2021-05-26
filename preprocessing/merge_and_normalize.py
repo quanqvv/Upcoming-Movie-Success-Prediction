@@ -85,8 +85,8 @@ def build_movie_dataframe():
         .dropDuplicates(["title", "release_year"])\
         .filter(col("critic_score").isNotNull())
 
-    print("Rotten")
-    df_rotten.show()
+    # print("Rotten")
+    # df_rotten.show()
 
     df_imdb = utils.read_csv_with_pyspark(spark, pathmng.imdb_path) \
             .withColumn("title", normalize_title_func("title"))\
@@ -113,10 +113,10 @@ def build_movie_dataframe():
     df_main = df_main.join(imdb_detail_df, on=["imdb_link"])\
         .withColumn("award", count_awards("release_year", "casts", "directors")) \
 
-    for _col in df_main.columns:
-        if _col in df_rotten.columns and _col != "title" and _col != "release_year":
-            df_main = df_main.drop(_col)
-    df_main = df_main.join(df_rotten, on = ["title", "release_year"])
+    # for _col in df_main.columns:
+    #     if _col in df_rotten.columns and _col != "title" and _col != "release_year":
+    #         df_main = df_main.drop(_col)
+    # df_main = df_main.join(df_rotten, on = ["title", "release_year"])
     df_main.show()
 
     print("count df main", df_main.count())

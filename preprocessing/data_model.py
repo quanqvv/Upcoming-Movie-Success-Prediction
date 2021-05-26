@@ -90,32 +90,24 @@ class DataModel:
     def get_full_feature(self, row: dict):
         vector = self.build_feature_vector(row, "*")
         vector.append(float(row["audience_score"]) * 100)
-        vector.append(int(row["box_office_gross"]))
         vector.append(int(row["opening_weekend_gross"]))
         return vector
 
     def get_feature_for_audience_score(self, row: dict):
         vector = self.build_feature_vector(row, "genre", "mpaa_rating", "runtime", "award", "studio")
+        vector.append(int(row["opening_weekend_gross"]))
         vector.append(float(row["audience_score"]) * 100)
         vector.append(int(row["box_office_gross"]))
-        vector.append(int(row["opening_weekend_gross"]))
         return vector
 
     def get_feature_for_box_office_gross(self, row: dict):
         vector = self.build_feature_vector(row, "genre", "mpaa_rating", "runtime", "studio", "award", "budget",
                                            "release_month")
+        vector.append(int(row["opening_weekend_gross"]))
         vector.append(float(row["audience_score"]) * 100)
         vector.append(int(row["box_office_gross"]))
-        vector.append(int(row["opening_weekend_gross"]))
         return vector
 
-    def get_feature_for_open_weekend_gross(self, row: dict):
-        vector = self.build_feature_vector(row, "genre", "mpaa_rating", "runtime", "studio", "award", "budget",
-                                           "release_month")
-        vector.append(float(row["audience_score"]) * 100)
-        vector.append(int(row["box_office_gross"]))
-        vector.append(int(row["opening_weekend_gross"]))
-        return vector
 
     @staticmethod
     def get_instance():

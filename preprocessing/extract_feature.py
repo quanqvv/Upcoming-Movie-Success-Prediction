@@ -60,13 +60,11 @@ def build_main(normalize_func):
 
     full_feature = df.rdd.map(lambda row: tuple(data_model.get_full_feature(row)))
     features_for_audience_score= df.rdd.map(lambda row: tuple(data_model.get_feature_for_audience_score(row)))
-    features_for_open_weekend_gross = df.rdd.map(lambda row: tuple(data_model.get_feature_for_open_weekend_gross(row)))
-    features_for_box_office_gross = df.rdd.map(lambda row: tuple(data_model.get_feature_for_open_weekend_gross(row)))
+    features_for_box_office_gross = df.rdd.map(lambda row: tuple(data_model.get_feature_for_box_office_gross(row)))
 
     import numpy as np
     np.save(pathmng.movie_full_feature_vector_path, np.array(full_feature.collect()))
     np.save(pathmng.movie_audience_score_vector_path, np.array(features_for_audience_score.collect()))
-    np.save(pathmng.movie_open_weekend_gross_vector_path, np.array(features_for_open_weekend_gross.collect()))
     np.save(pathmng.movie_box_office_gross_vector_path, np.array(features_for_box_office_gross.collect()))
 
 
@@ -85,7 +83,8 @@ def normalize_data(write=False):
     print("Size after normalized:", df_main.count())
     if write:
         df_main.toPandas().to_csv(pathmng.all_cleaned_movie_path, index=False)
-    df_main.show()
+    df_main.drop("opening_weekend_gross").drop("dvd_release_date").drop("count_award").show()
+    df_main = df_main.union(df_main)
     return df_main
 
 
@@ -102,7 +101,8 @@ def normalize_data_for_audience_score(write=False):
         .filter(col("plot_des").isNotNull())\
         .withColumn("budget", udf(lambda _col: utils.string_to_int_by_filter_number(_col), IntegerType())("budget"))\
         .withColumn("box_office_gross", udf(lambda _col: utils.string_to_int_by_filter_number(_col), IntegerType())("box_office_gross")) \
-        .withColumn("theater_release_date", udf(lambda _col: utils.normalize_date_string(_col), StringType())(col("theater_release_date"))).filter(col("theater_release_date").isNotNull()) \
+        .withColumn("theater_release_date", udf(lambda _col: utils.normalize_date_string(_col), StringType())(col("theater_release_date")))\
+        .filter(col("theater_release_date").isNotNull()) \
         .withColumn("opening_weekend_gross", udf(lambda _col: utils.string_to_int_by_filter_number(_col), IntegerType())("opening_weekend_gross"))
 
     df_main = normalize_money(df_main, "budget", "box_office_gross", "opening_weekend_gross")
