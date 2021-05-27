@@ -117,6 +117,7 @@ def build_movie_dataframe():
     #     if _col in df_rotten.columns and _col != "title" and _col != "release_year":
     #         df_main = df_main.drop(_col)
     # df_main = df_main.join(df_rotten, on = ["title", "release_year"])
+
     df_main.show()
 
     print("count df main", df_main.count())
@@ -126,7 +127,7 @@ def build_movie_dataframe():
     return df_main
 
 
-spark = SparkSession.builder.master("local[*]").appName("oke").getOrCreate()
+spark = SparkSession.builder.master("local[*]").config("spark.executor.memory", "3g").appName("oke").getOrCreate()
 if __name__ == '__main__':
     # spark.createDataFrame([["a", "b"]], ["a", "b"]).toPandas().to_csv(pathmng.temp_path)
     build_movie_dataframe()

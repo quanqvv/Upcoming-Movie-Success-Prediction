@@ -1,11 +1,10 @@
-from sklearn.metrics import mean_squared_error
-import numpy as np
+import matplotlib.pyplot as plt
+# plt.plot([1, 2, 3, 4], [4, 5, 6, 7])
+plt.ylim([0, 100])
+# plt.plot([7500, 8500, 12000, 14000], [65, 74, 75, 71])
+plt.plot([7500, 8500, 12000, 14000], [64, 74, 81, 83])
+# plt.plot([7500, 8500, 12000, 14000], [50, 74, 75, 71])
+plt.xlabel('Data size')
+plt.ylabel("Success rate")
 
-# Given values
-Y_true = np.array([1, 1, 2, 2, 1]).T # Y_true = Y (original values)
-
-# calculated values
-Y_pred = np.array([0.6, 1.29, 1.99, 2.69, 3000.4]).T # Y_pred = Y'
-
-# Calculation of Mean Squared Error (MSE)
-print(mean_squared_error(Y_true, Y_pred))
+plt.show()

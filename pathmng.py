@@ -23,5 +23,8 @@ movie_open_weekend_gross_vector_path = config.saving_data_path + "\\movie_open_w
 movie_box_office_gross_vector_path = config.saving_data_path + "\\movie_box_office_gross_vector.npy"
 
 all_cleaned_movie_path = config.crawl_data_path + "\\all_cleaned_movie_path.csv"
+all_cleaned_movie_path_oke = config.crawl_data_path + "\\all_cleaned_movie_path_oke.csv"
 
 consumer_price_index_path = config.saving_data_path + "\\consumer_price_index.csv"
+
+data_model_path = config.saving_data_path + "\\data_model.pkl"

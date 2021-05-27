@@ -19,7 +19,7 @@ def get_words_from_plot_des(paragraph_list):
 def build_main(normalize_func):
     # df = spark.read.csv(utils.build_hadoop_local_path(pathmng.all_cleaned_movie_path))
     # df = df.select("runtime", "count_award", "genre", "plot_des", "audience_score")
-    df = normalize_func().limit(20000).replace("Not Rated", "Unrated")
+    df = normalize_func().replace("Not Rated", "Unrated")
 
     genre_list = []
     paragraph_list = []
@@ -52,6 +52,9 @@ def build_main(normalize_func):
                            utils.filter_duplicate(plot_des_word_list),
                            utils.filter_duplicate(mpaa_ratings),
                            utils.filter_duplicate(utils.get_most_common(genre_list, 22)))
+
+    import pickle
+    pickle.dump(data_model, open(pathmng.data_model_path, "wb"))
 
     print("Studio:", len(utils.filter_duplicate(movie_studios)), utils.filter_duplicate(movie_studios))
     print("MPAA Rating:", len(utils.filter_duplicate(mpaa_ratings)), utils.filter_duplicate(mpaa_ratings))
@@ -95,7 +98,7 @@ def normalize_money(df: DataFrame, *money_column):
     return df
 
 
-def normalize_data_for_audience_score(write=False):
+def normalize_data_for_audience_score(write=True):
     # .filter(col("budget").isNotNull() & col("plot_des").isNotNull())
     df_main = utils.read_csv_with_pyspark(spark, pathmng.all_cleaned_movie_path)\
         .filter(col("plot_des").isNotNull())\
@@ -105,12 +108,23 @@ def normalize_data_for_audience_score(write=False):
         .filter(col("theater_release_date").isNotNull()) \
         .withColumn("opening_weekend_gross", udf(lambda _col: utils.string_to_int_by_filter_number(_col), IntegerType())("opening_weekend_gross"))
 
-    df_main = normalize_money(df_main, "budget", "box_office_gross", "opening_weekend_gross")
+    df_main = normalize_money(df_main, "budget", "box_office_gross", "opening_weekend_gross")\
+        .filter("box_office_gross != 0")\
+
+
+    # def normalize_budget(_col, _box_office):
+    #     if _col == 0:
+    #         return int(_box_office / 2)
+    #     else:
+    #         return _col
+    # df_main = df_main.withColumn("budget", udf(normalize_budget, StringType())(col("budget"), col("box_office_gross")))
+    # df_main = df_main.withColumn("audience_score", udf(lambda _col: float(_col) * 10, StringType())(col("audience_score"))).drop("imdb_link")
 
     print("Size after normalized:", df_main.count())
-    df_main.show()
+
     if write:
-        df_main.toPandas().to_csv(pathmng.all_cleaned_movie_path, index=False)
+        df_main.toPandas().to_csv(pathmng.all_cleaned_movie_path_oke, index=False)
+
     return df_main
 
 

@@ -87,12 +87,13 @@ def measure_accuracy(label_origin, label_predicted):
     counter = 0
     for index in range(label_predicted.size):
         if label_origin[index] != 0 and label_predicted[index] > 0:
-            temp = abs(abs(label_predicted[index]) - label_origin[index])/abs(max(label_origin[index], abs(label_predicted[index])))
+            temp = abs(label_predicted[index] - label_origin[index])/min(label_origin[index], label_predicted[index])
             # if temp > 1:
             #     print(label_origin[index], label_predicted[index])
             #     breakpoint()\
             error += temp
             counter += 1
+    print(len(label_origin), counter)
     print("Accuracy:", 1 - error/counter)
 
 
@@ -181,9 +182,45 @@ def get_exchanged_usd(value, year, to_year=2020):
         return 0
 
 
+class ObjectPersist:
+
+    @staticmethod
+    def dump(obj):
+        import os, pickle, tempfile
+        with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+            pickle.dump(obj, open(tmp_file.name, 'wb'))
+            with open(tmp_file.name, "rb") as file:
+                obj_bytes = file.read()
+        os.remove(tmp_file.name)
+        return obj_bytes
+
+    @staticmethod
+    def load(byte_array):
+        import os, pickle, tempfile
+        with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+            open(tmp_file.name, 'wb').write(byte_array)
+            obj = pickle.load(open(tmp_file.name, 'rb'))
+        os.remove(tmp_file.name)
+        return obj
+
+
+# if name == 'main':
+#     session = aeconnector.get_ae_session()
+#     my_key = AerospikeKey.get_default("obj_saving").get_key("cate_tree_df")
+#     res = session.get_record(my_key)["all"]
+#     print(ObjectPersist.load(res))
+
 if __name__ == '__main__':
     # print(filter_year("23 April 2021"))
     # print(get_datetime_from_string("April 27 2010 (USA)"))
-    print(get_exchanged_usd(100.1, "2018"))
+    import pickle
+    class Person:
+        def __init__(self):
+            self.x = 5
+        def get(self):
+            return "abcd"
+    # pickle.dump(Person(), open(pathmng.data_model_path, "wb"))
+    # print(pickle.load(open(pathmng.data_model_path, "rb")).movie_studio_list_encoder)
+    # print(get_exchanged_usd(100.1, "2018"))
 
 
