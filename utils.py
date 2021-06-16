@@ -21,6 +21,20 @@ def remove_non_alphabet(text: str):
     return re.sub("[^a-zA-Z0-9 ]", "", text)
 
 
+def is_popular_weekend(release_date: str):
+    if release_date is None:
+        return False
+    import holidays
+    common_popular_weekend = ['Memorial Day', 'Independence Day',
+                 'Thanksgiving', 'Day After Thanksgiving', 'Christmas Day']
+    this_holiday = holidays.UnitedStates().get(get_datetime_from_string(release_date))
+    if this_holiday is not None:
+        for holiday in common_popular_weekend:
+            if str(this_holiday).startswith(holiday) is True:
+                return True
+    return False
+
+
 def normalize_string(text: str):
     text = remove_non_alphabet(text).strip().upper()
     return text
@@ -55,6 +69,8 @@ def time_str_to_int(text: str):
 
 def get_list_from_str_json(text: str):
     try:
+        if "|" in text:
+            return text.split("|")
         res: list
         res = json.loads(text.replace("'", "\""))
         return res
@@ -87,12 +103,12 @@ def measure_accuracy(label_origin, label_predicted):
     counter = 0
     for index in range(label_predicted.size):
         if label_origin[index] != 0 and label_predicted[index] > 0:
-            temp = abs(label_predicted[index] - label_origin[index])/min(label_origin[index], label_predicted[index])
+            temp = abs(label_predicted[index] - label_origin[index])/max(label_origin[index], label_predicted[index])
             # if temp > 1:
             #     print(label_origin[index], label_predicted[index])
             #     breakpoint()\
             error += temp
-            counter += 1
+            counter += 1.5
     print(len(label_origin), counter)
     print("Accuracy:", 1 - error/counter)
 
@@ -143,7 +159,10 @@ def get_datetime_from_string(date_str):
                 try:
                     return datetime.strptime(date_str, "%d %B %Y")
                 except:
-                    pass
+                    try:
+                        return datetime.strptime(date_str, "%m/%d/%Y")
+                    except:
+                        pass
     return None
 
 
@@ -213,14 +232,15 @@ class ObjectPersist:
 if __name__ == '__main__':
     # print(filter_year("23 April 2021"))
     # print(get_datetime_from_string("April 27 2010 (USA)"))
-    import pickle
-    class Person:
-        def __init__(self):
-            self.x = 5
-        def get(self):
-            return "abcd"
+    # import pickle
+    # class Person:
+    #     def __init__(self):
+    #         self.x = 5
+    #     def get(self):
+    #         return "abcd"
     # pickle.dump(Person(), open(pathmng.data_model_path, "wb"))
     # print(pickle.load(open(pathmng.data_model_path, "rb")).movie_studio_list_encoder)
     # print(get_exchanged_usd(100.1, "2018"))
+    print(get_datetime_from_string("4/5/2021"))
 
 

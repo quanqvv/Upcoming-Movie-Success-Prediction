@@ -128,7 +128,9 @@ def build_movie_dataframe():
 
 
 spark = SparkSession.builder.master("local[*]").config("spark.executor.memory", "3g").appName("oke").getOrCreate()
+
 if __name__ == '__main__':
     # spark.createDataFrame([["a", "b"]], ["a", "b"]).toPandas().to_csv(pathmng.temp_path)
-    build_movie_dataframe()
+    # build_movie_dataframe()
     # normalize_data(write=True)
+    pass
