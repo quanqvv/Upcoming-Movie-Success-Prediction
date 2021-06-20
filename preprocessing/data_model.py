@@ -93,7 +93,6 @@ class DataModel:
     def build_feature_dict(self, row):
         release_date = utils.get_datetime_from_string(row["theater_release_date"])
         temp = 0
-
         return {
             "mpaa_rating": self.mpaa_rating_list_encoder.get_bit_vector(row["mpaa_rating"]),
             "runtime": (float(row["runtime"]) / 500,),
@@ -101,7 +100,7 @@ class DataModel:
             "release_month": get_release_month_vector(row["theater_release_date"]),
             # "popular_weekend": get_popular_weekend_vector(release_date.strftime("%Y-%m-%d")),
             "budget": (float(row["budget"]) / 12215500000,),
-            # "award": (int(row["award"]),),
+            "award": (int(row["award"]),),
             "genre": self.genre_list_encoder.get_bit_vector(utils.get_list_from_str_json(row["genre"])),
             "plot_des": self.plot_des_word_list_encoder.get_bit_vector([preprocess_word(_) for _ in row["plot_des"].split(" ")])
         }
@@ -147,8 +146,8 @@ class DataModel:
                 vector[index] = 1
                 # print(row)
                 # break
-        return vector
-        # return ()
+        # return vector
+        return ()
 
     def build_feature_vector(self, row, *feature_names):
 
@@ -158,7 +157,7 @@ class DataModel:
         vector = []
         for feature_name in feature_names:
             vector.extend(feature_dict[feature_name])
-        # vector.extend(self.get_other_features(row))
+        vector.extend(self.get_other_features(row))
         return vector
 
     def get_full_feature(self, row: dict):

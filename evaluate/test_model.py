@@ -102,14 +102,14 @@ def test_each_model(dataX, dataY, train_set, train_label_set, test_set, test_lab
 
     logreg_model = LogisticRegression(C=1e5, max_iter=1000)
     decision_tree = tree.DecisionTreeClassifier(max_depth=7)
-    svm_model = svm.SVC(kernel='rbf', C=2, gamma=2)
-    svm_model2 = svm.SVC(kernel='linear', C=2, gamma=2)
-    svm_model3 = svm.SVC(kernel='poly', C=1, gamma=2)
-    clf = GaussianNB()
-    # mlp_model = MLPClassifier(hidden_layer_sizes=(15,), activation='identity', max_iter=max_iter)
-    # mlp_model2 = MLPClassifier(hidden_layer_sizes=(15,), activation='logistic', max_iter=max_iter)
-    # mlp_model3 = MLPClassifier(hidden_layer_sizes=(15,), activation='tanh', max_iter=max_iter)
-    # mlp_model4 = MLPClassifier(hidden_layer_sizes=(15,), activation='relu', max_iter=max_iter)
+    # svm_model = svm.SVC(kernel='rbf', C=2, gamma=2)
+    # svm_model2 = svm.SVC(kernel='linear', C=2, gamma=2)
+    # svm_model3 = svm.SVC(kernel='poly', C=1, gamma=2)
+    # clf = GaussianNB()
+    mlp_model = MLPClassifier(hidden_layer_sizes=(15,), activation='identity', max_iter=max_iter)
+    mlp_model2 = MLPClassifier(hidden_layer_sizes=(15,), activation='logistic', max_iter=max_iter)
+    mlp_model3 = MLPClassifier(hidden_layer_sizes=(15,), activation='tanh', max_iter=max_iter)
+    mlp_model4 = MLPClassifier(hidden_layer_sizes=(15,), activation='relu', max_iter=max_iter)
     mlp_model5 = MLPClassifier(hidden_layer_sizes=(20,), activation='identity', max_iter=max_iter)
     mlp_model6 = MLPClassifier(hidden_layer_sizes=(20,), activation='logistic', max_iter=max_iter)
     mlp_model7 = MLPClassifier(hidden_layer_sizes=(20,), activation='tanh', max_iter=max_iter)
@@ -118,18 +118,19 @@ def test_each_model(dataX, dataY, train_set, train_label_set, test_set, test_lab
     model_to_name = {
         logreg_model: "Logistic Regression",
         tree.DecisionTreeClassifier(max_depth=8): "Decision Tree (depth = 8)",
-        svm_model: "SVM (Kernel = RBF)",
-        svm_model2: "SVM (Kernel = Linear)",
-        svm_model3: "SVM (Kernel = Poly)",
-        clf: "Gaussian Naive Bayes",
+        # svm_model: "SVM (Ker
+        # nel = RBF)",
+        # svm_model2: "SVM (Kernel = Linear)",
+        # svm_model3: "SVM (Kernel = Poly)",
+        # clf: "Gaussian Naive Bayes",
         # mlp_model: "MLP identity",
         # mlp_model2: "MLP logistic",
         # mlp_model3: "MLP tanh",
         # mlp_model4: "MLP relu",
         mlp_model5: "MLP (Act = Identity)",
-        mlp_model6: "MLP (Act = Logistic)",
-        mlp_model7: "MLP (Act = Tanh)",
-        mlp_model8: "MLP (Act = Relu)",
+        # mlp_model6: "MLP (Act = Logistic)",
+        # mlp_model7: "MLP (Act = Tanh)",
+        # mlp_model8: "MLP (Act = Relu)",
     }
 
     results = []

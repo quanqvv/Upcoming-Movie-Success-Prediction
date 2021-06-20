@@ -22,13 +22,14 @@ df = pandas.read_csv(pathmng.final_movie_data_path)
 data_model = data_model.get_data_model()
 
 df = df[df.box_office_gross > 0][df.budget > 0]
-df["success"] = df["box_office_gross"] > 2 * df["budget"]
+df["success"] = df["box_office_gross"] > 1.3 * df["budget"]
 df = df.sort_values("success", ascending=False)[0:5500]
 # df = df.sort_values("release_year", ascending=False)
 
 df_train, df_test = train_test_split(df, test_size=0.3, random_state=False)
 
-
+del df_test["success"]
+df_test["success"] = df["box_office_gross"] > 1.3 * df["budget"]
 df_test = df_test.sort_values(by=["release_year", "success"], ascending=False)
 df_test.to_csv(pathmng.final_test_movie_data_path, index=False, header=True)
 

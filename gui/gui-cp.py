@@ -25,6 +25,27 @@ def get_real_field_name(name_field):
    return real_field[fields.index(name_field)]
 
 
+class Table:
+    def __init__(self, root):
+        self.root = root
+
+    def update(self, lst):
+        total_rows = len(lst)
+        total_columns = len(lst[0])
+        # code for creating table
+        for i in range(total_rows):
+            for j in range(total_columns):
+                if i == 0:
+                    self.e = Entry(self.root, width=40,
+                                   font=('Arial', 10, "bold"))
+                else:
+                    self.e = Entry(self.root, width=40,
+                                   font=('Arial', 10))
+
+                self.e.grid(row=i, column=j)
+                self.e.insert(END, lst[i][j])
+
+
 def parse_data(entries):
     clip_board_data = root.clipboard_get()
     # raw_data = entries["Raw Data"].get().replace("\n", "").split("\t")
@@ -48,7 +69,7 @@ def parse_data(entries):
             entry.insert(0, field_to_data[real_field])
 
 
-def check_success(entries, result_var):
+def check_success(entries, table: Table):
     movie_data = {}
     for index, field in enumerate(fields):
         movie_data[real_field[index]] = entries[field].get()
@@ -62,13 +83,10 @@ def check_success(entries, result_var):
     for model, name in model_dict.items():
         result = model.predict([data_model.get_input_feature(movie_data)])
         result = "True" if result[0] == 1 else "False"
-        # more = "".join([" "] * (40 - len(name)))
-        # results.append(f"{name}:{more}{result}")
         results.append([name, result])
-    print([_.__len__() for _ in results])
-    x = pandas.DataFrame(results, columns=["Model Name", "Result"]).to_string(col_space=10)
-    print(x)
-    result_var.set(x)
+    df = pandas.DataFrame(results, columns=["Model Name", "Result"])
+    table_value = [df.columns.values.tolist()] + df.values.tolist()
+    table.update(table_value)
 
 
 def makeform(root, fields):
@@ -83,18 +101,16 @@ def makeform(root, fields):
         ent.pack(side=RIGHT, expand=YES, fill=X)
         entries[field] = ent
 
-    result_var = StringVar()
     fontStyle = Font(family="Lucida Grande", size=10, weight="normal")
     row = Frame(root)
     lab = Label(row, width=22, text="Predicted" + ": ", anchor='w')
-    ent = Message(row, width=300, textvariable=result_var, relief=RAISED, font=fontStyle)
-    row.pack(side=TOP, fill=X, padx=5, pady=5)
     lab.pack(side=LEFT)
-    ent.pack(side=RIGHT, expand=YES, fill=X)
 
-    # result_var.set()
-
-    return entries, result_var
+    table_frame = Frame(row)
+    table = Table(table_frame)
+    table_frame.pack(side=RIGHT)
+    row.pack(side=TOP, fill=X, padx=5, pady=5)
+    return entries, table
 
 
 if __name__ == '__main__':
@@ -105,13 +121,13 @@ if __name__ == '__main__':
     style = Style(root)
     style.theme_use("vista")
 
-    ents, result_var = makeform(root, fields)
+    ents, table = makeform(root, fields)
     root.bind('<Return>', (lambda event, e: None))
     b3 = Button(root, text='Parse',
                 command=(lambda e=ents: parse_data(e)))
     b3.pack(side=LEFT, padx=5, pady=5)
     b2 = Button(root, text='Check Success',
-                command=(lambda e=ents, p=result_var: check_success(e, result_var)))
+                command=(lambda e=ents, p=table: check_success(e, table)))
     b2.pack(side=LEFT, padx=5, pady=5)
 
     root.mainloop()
